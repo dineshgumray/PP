@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="auth-layout wide">
+    <form class="card auth-form signup-form" method="post">
+      <label>
+        <span>Name</span>
+        <input type="text" name="name" value="{{ profile.get('name', '') }}" required>
+      </label>
+      <label>
+        <span>Email</span>
+        <input type="email" name="email" value="{{ profile.get('email', '') }}" required>
+      </label>
+      <label>
+        <span>Password</span>
+        <input type="password" name="password" required>
+      </label>
+      <label>
+        <span>Occupation</span>
+        <input type="text" name="occupation" value="{{ profile.get('occupation', '') }}" required>
+      </label>
+      <label>
+        <span>Location</span>
+        <input type="text" name="location" value="{{ profile.get('location', '') }}" required>
+      </label>
+      <label>
+        <span>Date of birth</span>
+        <input type="date" name="date_of_birth" value="{{ profile.get('date_of_birth', '') }}" required>
+      </label>
+      <label class="full-width">
+        <span>Goals (optional)</span>
+        <textarea name="goals" rows="4">{{ profile.get('goals', '') }}</textarea>
+      </label>
+      <button class="primary-button full-width" type="submit">Create profile</button>
+      <p class="muted-line full-width">
+        Already registered?
+        <a href="{{ url_for('login') }}">Login</a>
+      </p>
+    </form>
+  </section>
+{% endblock %}

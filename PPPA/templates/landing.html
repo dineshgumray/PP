@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="hero-grid">
+    <div class="hero-copy card lift">
+      <h1>Stop repeating your background every time you ask an LLM for help.</h1>
+      <p class="lede">
+        PromptPilot stores a user profile during signup, turns each request into a richer optimized prompt,
+        and can either hand that prompt to Groq or generate the final answer locally through Ollama.
+      </p>
+      <div class="hero-actions">
+        <a class="solid-link" href="{{ url_for('signup') }}">Start with your profile</a>
+        <a class="ghost-link" href="{{ url_for('login') }}">I already have an account</a>
+      </div>
+    </div>
+
+    <div class="hero-panel card">
+      <div class="signal-chip">How it works</div>
+      <ol class="workflow-list">
+        <li>Create a profile with role, location, date of birth, and goals.</li>
+        <li>Choose a use case and describe the task once.</li>
+        <li>PromptPilot injects the right context automatically.</li>
+        <li>Use the optimized prompt anywhere, or generate in-app with Groq.</li>
+      </ol>
+      <div class="mini-preview">
+        <span>Prompt mode</span>
+        <p>
+          "Write a concise relocation plan for a 28-year-old product manager moving from Pune to Berlin..."
+        </p>
+      </div>
+    </div>
+  </section>
+{% endblock %}

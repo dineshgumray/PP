@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="dashboard-grid">
+    <aside class="sidebar-column">
+      <div class="card profile-card collapsible-card" data-collapsible-section>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">My profile</p>
+            <h1>{{ g.user["name"] }}</h1>
+          </div>
+          <div class="section-toggle-meta">
+            <div class="profile-badge">{{ g.user["occupation"] }}</div>
+            <button
+              class="toggle-pill"
+              type="button"
+              data-section-toggle
+              data-toggle-label
+              data-toggle-closed-label="Show"
+              data-toggle-open-label="Hide"
+              aria-expanded="false"
+              aria-controls="profile-panel"
+            >
+              Show
+            </button>
+          </div>
+        </div>
+
+        <div id="profile-panel" class="collapsible-body is-hidden" data-section-body>
+          <form class="profile-form" method="post" action="{{ url_for('update_profile') }}">
+            <label>
+              <span>Name</span>
+              <input type="text" name="name" value="{{ g.user['name'] }}" required>
+            </label>
+            <label>
+              <span>Occupation</span>
+              <input type="text" name="occupation" value="{{ g.user['occupation'] }}" required>
+            </label>
+            <label>
+              <span>Location</span>
+              <input type="text" name="location" value="{{ g.user['location'] }}" required>
+            </label>
+            <label>
+              <span>Date of birth</span>
+              <input type="date" name="date_of_birth" value="{{ g.user['date_of_birth'] }}" required>
+            </label>
+            <label class="full-width">
+              <span>Goals (optional)</span>
+              <textarea name="goals" rows="4">{{ g.user['goals'] }}</textarea>
+            </label>
+            <button class="secondary-button full-width" type="submit">Update profile</button>
+            <button
+              class="danger-button full-width"
+              type="submit"
+              formaction="{{ url_for('delete_profile') }}"
+              formmethod="post"
+              formnovalidate
+              data-delete-profile-button
+            >
+              Delete profile
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card history-card collapsible-card" data-collapsible-section>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">History</p>
+            <h2>History</h2>
+          </div>
+          <div class="section-toggle-meta">
+            <span class="history-count">{{ history|length }} items</span>
+            <button
+              class="toggle-pill"
+              type="button"
+              data-section-toggle
+              data-toggle-label
+              data-toggle-closed-label="Show"
+              data-toggle-open-label="Hide"
+              aria-expanded="false"
+              aria-controls="history-panel"
+            >
+              Show
+            </button>
+          </div>
+        </div>
+        <div id="history-panel" class="collapsible-body is-hidden" data-section-body>
+          {% if history %}
+            <div class="history-toolbar">
+              <form method="post" action="{{ url_for('clear_history') }}" data-clear-history-form>
+                <button class="ghost-button small-button" type="submit">Clear history</button>
+              </form>
+            </div>
+            <div class="history-list">
+              {% for item in history %}
+                <article class="history-item">
+                  <div>
+                    <strong>{{ provider_labels[item['provider']] }}</strong>
+                    <span>{{ item["mode"]|title }} | {{ item["use_case"]|replace('-', ' ')|title }}</span>
+                  </div>
+                  <p class="history-task-text">{{ item["task"] }}</p>
+                  <div class="history-actions">
+                    <button class="ghost-button small-button" type="button" data-copy-history-task>
+                      Copy task
+                    </button>
+                  </div>
+                  <small>{{ item["status"] }} | {{ item["created_at"] }}</small>
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted-line">No history found.</p>
+          {% endif %}
+        </div>
+      </div>
+    </aside>
+
+    <section class="workspace-column">
+      <div class="card workspace-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Workspace</p>
+          </div>
+        </div>
+
+        <form id="generator-form" class="generator-form">
+          <div class="generator-grid">
+            <label>
+              <span>Mode</span>
+              <select name="mode" id="mode-select">
+                <option value="prompt">Prompt mode</option>
+                <option value="generate">Generate final output</option>
+              </select>
+            </label>
+            <label id="provider-field" class="hidden">
+              <span>Target provider</span>
+              <select name="target_provider" id="provider-select">
+                <option value="groq" selected>Groq</option>
+                <option value="ollama">Ollama</option>
+                <option value="chatgpt">ChatGPT</option>
+                <option value="gemini">Gemini</option>
+                <option value="claude">Claude</option>
+              </select>
+            </label>
+            <label id="model-field">
+              <span id="model-label">Provider model</span>
+              <input id="model-input" type="text" name="model" placeholder="llama-3.3-70b-versatile">
+            </label>
+            <label class="full-width">
+              <span>Task</span>
+              <textarea name="task" rows="4" placeholder="Example: Create a relocation checklist for my move to Berlin, tailored to a product manager interviewing at SaaS startups." required></textarea>
+            </label>
+
+            <div class="full-width prompt-options-block" data-collapsible-section>
+              <button
+                class="toggle-pill more-toggle"
+                type="button"
+                data-section-toggle
+                data-toggle-label
+                data-toggle-closed-label="More"
+                data-toggle-open-label="Less"
+                aria-expanded="false"
+                aria-controls="prompt-options-panel"
+              >
+                More
+              </button>
+              <div id="prompt-options-panel" class="collapsible-body is-hidden" data-section-body>
+                <div class="generator-grid">
+                  <label>
+                    <span>Use case</span>
+                    <select name="use_case">
+                      <option value="career">Career</option>
+                      <option value="content">Content</option>
+                      <option value="study">Study</option>
+                      <option value="travel">Travel</option>
+                      <option value="business">Business</option>
+                      <option value="coding">Coding</option>
+                      <option value="research">Research</option>
+                      <option value="personal-brand">Personal brand</option>
+                      <option value="general" selected>General</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Desired format</span>
+                    <select name="desired_format">
+                      <option>Concise answer</option>
+                      <option>Step-by-step plan</option>
+                      <option>Email draft</option>
+                      <option>Social media post</option>
+                      <option>Professional proposal</option>
+                      <option>Code solution</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Output length</span>
+                    <select name="output_length">
+                      <option>Short</option>
+                      <option selected>Medium</option>
+                      <option>Detailed</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Audience</span>
+                    <input type="text" name="audience" placeholder="Hiring manager, customers, beginner learner...">
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button id="generate-button" class="primary-button" type="submit">Submit</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card output-card prompt-mode">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Result</p>
+          </div>
+          <span id="status-pill" class="status-pill idle" hidden></span>
+        </div>
+
+        <div class="output-panel-headings">
+          <div class="output-panel-header">
+            <h3>Optimized prompt</h3>
+            <button id="copy-prompt" class="ghost-button small-button" type="button">Copy prompt</button>
+          </div>
+          <div class="output-panel-header generate-only is-hidden" data-generate-only hidden>
+            <h3>Final output</h3>
+            <button id="copy-response" class="ghost-button small-button" type="button">Copy output</button>
+          </div>
+        </div>
+
+        <div class="output-panels">
+          <section>
+            <pre id="prompt-output">No prompt generated yet.</pre>
+          </section>
+          <section class="generate-only is-hidden" data-generate-only hidden>
+            <div id="response-output" class="response-box">No final output yet.</div>
+          </section>
+        </div>
+      </div>
+
+    </section>
+  </section>
+{% endblock %}

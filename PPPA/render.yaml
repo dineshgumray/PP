@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: promptpilot
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PORT
+        value: 10000
+      - key: DATABASE
+        value: instance/promptpilot.db
+      - key: LOG_FILE
+        value: instance/promptpilot-wizard.log
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
