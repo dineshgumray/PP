@@ -19,8 +19,9 @@ The stack is intentionally low-friction:
    - date of birth
    - goals
 2. Stores that profile in SQLite.
-3. Merges profile data with the current task, use case, audience, and desired output shape.
-4. Returns either:
+3. Merges profile data, stored goals, and the current task, use case, audience, and desired output shape.
+4. Keeps the response centered on the stored goal. If a generate-mode task drifts away from it, the app returns a goal-based redirect instead of calling the model.
+5. Returns either:
    - an optimized prompt for the selected provider, or
    - a final generated answer when the target provider supports live inference.
 
@@ -60,6 +61,101 @@ Ollama remains available if you want a local model, and OpenAI, Gemini, and Clau
 |-- render.yaml
 `-- requirements.txt
 ```
+
+## Class diagram
+
+```mermaid
+classDiagram
+    class PromptPilotApp {
+        +create_app(test_config)
+        +signup()
+        +login()
+        +logout()
+        +dashboard()
+        +history_fragment()
+        +clear_history()
+        +update_profile()
+        +delete_profile()
+        +generate()
+    }
+
+    class PromptRequest {
+        +task: str
+        +use_case: str
+        +target_provider: str
+        +mode: str
+        +audience: str
+        +desired_format: str
+        +output_length: str
+        +model: str
+        +thinking_styles: str
+        +from_payload(payload) PromptRequest
+    }
+
+    class PromptFlowService {
+        +evaluate_goal_alignment(user_profile, prompt_request)
+        +build_goal_focus_lines(user_profile)
+        +build_goal_redirect_text(goal_alignment)
+        +initialize_prompt_variants(user_profile, prompt_request)
+        +task_aware_scoring(candidates, prompt_request)
+        +prompt_refinement(best_candidate, critique, user_profile, prompt_request)
+        +run_prompt_wizard(user_profile, prompt_request)
+        +build_handoff_note(provider, mode)
+    }
+
+    class DatabaseStore {
+        +get_db()
+        +init_db()
+        +repair_database_schema()
+        +save_generation(user_id, prompt_request, optimized_prompt, response_text, status)
+        +get_recent_history(user_id, limit)
+    }
+
+    class LLMClientError
+
+    class BaseHTTPClient {
+        +timeout
+        +post_json(url, payload, headers, provider_name)
+    }
+
+    class ResponsesAPIClient {
+        +api_key
+        +base_url
+        +default_model
+        +api_key_name
+        +provider_name
+        +generate(prompt, model)
+    }
+
+    class OllamaClient {
+        +generate(prompt, model)
+    }
+
+    class OpenAIClient
+    class GroqClient
+
+    class GeminiClient {
+        +generate(prompt, model)
+    }
+
+    class AnthropicClient {
+        +generate(prompt, model)
+    }
+
+    PromptPilotApp --> PromptRequest : parses payloads
+    PromptPilotApp --> PromptFlowService : runs prompt flow
+    PromptPilotApp --> DatabaseStore : reads/writes users and history
+    PromptPilotApp --> BaseHTTPClient : instantiates provider clients
+    BaseHTTPClient <|-- ResponsesAPIClient
+    BaseHTTPClient <|-- OllamaClient
+    BaseHTTPClient <|-- GeminiClient
+    BaseHTTPClient <|-- AnthropicClient
+    ResponsesAPIClient <|-- OpenAIClient
+    ResponsesAPIClient <|-- GroqClient
+    BaseHTTPClient ..> LLMClientError : raises
+```
+
+The `PromptPilotApp`, `PromptFlowService`, and `DatabaseStore` boxes are conceptual wrappers around the Flask routes and module-level helpers in `app.py` and `services/prompt_engine.py`. The prompt flow now keeps the saved goal visible in the prompt and uses a goal-based redirect for generate-mode tasks that drift away from that goal.
 
 ## Run locally
 
@@ -169,4 +265,10 @@ SQLite works fine for demos and low-volume usage. If you need durable history on
 
 ```powershell
 python -m unittest discover -s tests -v
+```
+
+For the Ollama-specific scenario coverage added in `tests/test_ollama_profiles.py`, run:
+
+```powershell
+python -m unittest discover -s tests -p test_ollama_profiles.py -v
 ```

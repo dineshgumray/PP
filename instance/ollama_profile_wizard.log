@@ -1,0 +1,88 @@
+[2026-04-19T20:21:09] Prompt flow run
+user_id=1 user_name='Aarav Sharma' provider=ollama mode=generate use_case=business status=generated
+selected_variant=style-led selected_score=88
+Prompt flow
+- Task Input: task='Draft a quarterly product update for the leadership team.' use_case=business provider=ollama mode=generate audience='Leadership team' format='Executive summary' length='Medium'.
+- Prompt Initialization: generated 4 candidate drafts (goal-first, style-led, compact-executor, analyst).
+- Critique & Evaluation: strengths=It uses enough profile context to avoid repeating the background.; It surfaces the reasoning style early.; It protects against missing critical details.; gaps=A smaller local model may benefit from a tighter prompt.; The analyst variant is close enough to suggest the balance of brevity and context could still move.; The thinking styles are present, but they should sit closer to the task..
+- Task-Aware Scoring: style-led=88, analyst=87, goal-first=80, compact-executor=76. Best draft style-led scored 88.
+- Prompt Refinement: The original best draft remained stronger, so it was retained. Refined variant style-led + critique scored 86.
+- Optimized Prompt: selected style-led at 88.
+
+[2026-04-19T20:21:37] Prompt flow run
+user_id=2 user_name='Maya Johnson' provider=ollama mode=generate use_case=content status=generated
+selected_variant=style-led + critique selected_score=89
+Prompt flow
+- Task Input: task='Write a LinkedIn post announcing a career pivot.' use_case=content provider=ollama mode=generate audience='LinkedIn followers' format='Social post' length='Short'.
+- Prompt Initialization: generated 4 candidate drafts (goal-first, style-led, compact-executor, analyst).
+- Critique & Evaluation: strengths=It uses enough profile context to avoid repeating the background.; It surfaces the reasoning style early.; It protects against missing critical details.; gaps=A smaller local model may benefit from a tighter prompt.; The analyst variant is close enough to suggest the balance of brevity and context could still move.; The thinking styles are present, but they should sit closer to the task..
+- Task-Aware Scoring: style-led=84, analyst=83, compact-executor=79, goal-first=76. Best draft style-led scored 84.
+- Prompt Refinement: The refined prompt won the iteration and replaced the original best draft. Refined variant style-led + critique scored 89.
+- Optimized Prompt: selected style-led + critique at 89.
+
+[2026-04-19T20:23:01] Prompt flow run
+user_id=5 user_name='Sofia Rossi' provider=ollama mode=generate use_case=travel status=generated
+selected_variant=style-led + critique selected_score=89
+Prompt flow
+- Task Input: task='Build a 3-day Tokyo itinerary with transit tips.' use_case=travel provider=ollama mode=generate audience='Solo traveler' format='Itinerary' length='Medium'.
+- Prompt Initialization: generated 4 candidate drafts (goal-first, style-led, compact-executor, analyst).
+- Critique & Evaluation: strengths=It uses enough profile context to avoid repeating the background.; It surfaces the reasoning style early.; It protects against missing critical details.; gaps=A smaller local model may benefit from a tighter prompt.; The analyst variant is close enough to suggest the balance of brevity and context could still move.; The thinking styles are present, but they should sit closer to the task..
+- Task-Aware Scoring: style-led=84, analyst=83, compact-executor=79, goal-first=76. Best draft style-led scored 84.
+- Prompt Refinement: The refined prompt won the iteration and replaced the original best draft. Refined variant style-led + critique scored 89.
+- Optimized Prompt: selected style-led + critique at 89.
+
+[2026-04-19T20:23:42] Prompt flow run
+user_id=6 user_name='Noah Kim' provider=ollama mode=generate use_case=business status=generated
+selected_variant=style-led selected_score=88
+Prompt flow
+- Task Input: task='Summarize monthly revenue, churn, and next steps for investors.' use_case=business provider=ollama mode=generate audience='Investors' format='Investor update' length='Short'.
+- Prompt Initialization: generated 4 candidate drafts (goal-first, style-led, compact-executor, analyst).
+- Critique & Evaluation: strengths=It uses enough profile context to avoid repeating the background.; It surfaces the reasoning style early.; It protects against missing critical details.; gaps=A smaller local model may benefit from a tighter prompt.; The analyst variant is close enough to suggest the balance of brevity and context could still move.; The thinking styles are present, but they should sit closer to the task..
+- Task-Aware Scoring: style-led=88, analyst=87, goal-first=80, compact-executor=76. Best draft style-led scored 88.
+- Prompt Refinement: The original best draft remained stronger, so it was retained. Refined variant style-led + critique scored 86.
+- Optimized Prompt: selected style-led at 88.
+
+[2026-04-19T20:24:57] Prompt flow run
+user_id=7 user_name='Elena Petrova' provider=ollama mode=generate use_case=research status=generated
+selected_variant=style-led selected_score=88
+Prompt flow
+- Task Input: task='Summarize the latest findings on remote work productivity.' use_case=research provider=ollama mode=generate audience='Policy team' format='Research brief' length='Medium'.
+- Prompt Initialization: generated 4 candidate drafts (goal-first, style-led, compact-executor, analyst).
+- Critique & Evaluation: strengths=It uses enough profile context to avoid repeating the background.; It surfaces the reasoning style early.; It protects against missing critical details.; gaps=A smaller local model may benefit from a tighter prompt.; The analyst variant is close enough to suggest the balance of brevity and context could still move.; The thinking styles are present, but they should sit closer to the task..
+- Task-Aware Scoring: style-led=88, analyst=87, goal-first=80, compact-executor=76. Best draft style-led scored 88.
+- Prompt Refinement: The original best draft remained stronger, so it was retained. Refined variant style-led + critique scored 86.
+- Optimized Prompt: selected style-led at 88.
+
+[2026-04-19T20:25:52] Prompt flow run
+user_id=8 user_name='Jordan Lee' provider=ollama mode=generate use_case=personal-brand status=generated
+selected_variant=style-led + critique selected_score=86
+Prompt flow
+- Task Input: task='Rewrite my bio for a portfolio site.' use_case=personal-brand provider=ollama mode=generate audience='Hiring managers' format='Bio' length='Short'.
+- Prompt Initialization: generated 4 candidate drafts (goal-first, style-led, compact-executor, analyst).
+- Critique & Evaluation: strengths=It uses enough profile context to avoid repeating the background.; It surfaces the reasoning style early.; It protects against missing critical details.; gaps=A smaller local model may benefit from a tighter prompt.; The analyst variant is close enough to suggest the balance of brevity and context could still move.; The thinking styles are present, but they should sit closer to the task..
+- Task-Aware Scoring: style-led=84, analyst=83, goal-first=76, compact-executor=76. Best draft style-led scored 84.
+- Prompt Refinement: The refined prompt won the iteration and replaced the original best draft. Refined variant style-led + critique scored 86.
+- Optimized Prompt: selected style-led + critique at 86.
+
+[2026-04-19T20:26:27] Prompt flow run
+user_id=9 user_name='Hannah Brooks' provider=ollama mode=generate use_case=general status=generated
+selected_variant=style-led + critique selected_score=89
+Prompt flow
+- Task Input: task='Create a simple onboarding checklist for a new hire.' use_case=general provider=ollama mode=generate audience='New teammate' format='Checklist' length='Short'.
+- Prompt Initialization: generated 4 candidate drafts (goal-first, style-led, compact-executor, analyst).
+- Critique & Evaluation: strengths=It uses enough profile context to avoid repeating the background.; It surfaces the reasoning style early.; It protects against missing critical details.; gaps=A smaller local model may benefit from a tighter prompt.; The analyst variant is close enough to suggest the balance of brevity and context could still move.; The thinking styles are present, but they should sit closer to the task..
+- Task-Aware Scoring: style-led=84, analyst=83, compact-executor=79, goal-first=76. Best draft style-led scored 84.
+- Prompt Refinement: The refined prompt won the iteration and replaced the original best draft. Refined variant style-led + critique scored 89.
+- Optimized Prompt: selected style-led + critique at 89.
+
+[2026-04-19T20:27:31] Prompt flow run
+user_id=10 user_name='Imani Clarke' provider=ollama mode=generate use_case=career status=generated
+selected_variant=style-led + critique selected_score=86
+Prompt flow
+- Task Input: task='Draft a cold outreach email for a product design partnership.' use_case=career provider=ollama mode=generate audience='Design director' format='Email draft' length='Short'.
+- Prompt Initialization: generated 4 candidate drafts (goal-first, style-led, compact-executor, analyst).
+- Critique & Evaluation: strengths=It uses enough profile context to avoid repeating the background.; It surfaces the reasoning style early.; It protects against missing critical details.; gaps=A smaller local model may benefit from a tighter prompt.; The analyst variant is close enough to suggest the balance of brevity and context could still move.; The thinking styles are present, but they should sit closer to the task..
+- Task-Aware Scoring: style-led=84, analyst=83, goal-first=76, compact-executor=76. Best draft style-led scored 84.
+- Prompt Refinement: The refined prompt won the iteration and replaced the original best draft. Refined variant style-led + critique scored 86.
+- Optimized Prompt: selected style-led + critique at 86.
+

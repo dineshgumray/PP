@@ -1,0 +1,51 @@
+ * Tip: There are .env files present. Install python-dotenv to use them.
+ * Serving Flask app 'app'
+ * Debug mode: on
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:61818
+ * Running on http://192.168.0.6:61818
+Press CTRL+C to quit
+ * Restarting with watchdog (windowsapi)
+ * Tip: There are .env files present. Install python-dotenv to use them.
+ * Debugger is active!
+ * Debugger PIN: 125-481-582
+127.0.0.1 - - [19/Apr/2026 20:20:15] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:20:15] "POST /signup HTTP/1.1" 302 -
+127.0.0.1 - - [19/Apr/2026 20:20:15] "GET /dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:21:09] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:21:09] "POST /signup HTTP/1.1" 302 -
+127.0.0.1 - - [19/Apr/2026 20:21:09] "GET /dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:21:37] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:21:37] "POST /signup HTTP/1.1" 302 -
+127.0.0.1 - - [19/Apr/2026 20:21:37] "GET /dashboard HTTP/1.1" 200 -
+ * Detected change in 'C:\\Users\\dines\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\datetime.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Tip: There are .env files present. Install python-dotenv to use them.
+ * Debugger is active!
+ * Debugger PIN: 125-481-582
+ * Detected change in 'C:\\Users\\dines\\PPPA\\.venv\\Lib\\site-packages\\werkzeug\\local.py', reloading
+127.0.0.1 - - [19/Apr/2026 20:22:00] "POST /signup HTTP/1.1" 302 -
+127.0.0.1 - - [19/Apr/2026 20:22:00] "GET /dashboard HTTP/1.1" 200 -
+ * Restarting with watchdog (windowsapi)
+ * Tip: There are .env files present. Install python-dotenv to use them.
+ * Debugger is active!
+ * Debugger PIN: 125-481-582
+127.0.0.1 - - [19/Apr/2026 20:22:02] "POST /signup HTTP/1.1" 302 -
+127.0.0.1 - - [19/Apr/2026 20:22:02] "GET /dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:23:01] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:23:02] "POST /signup HTTP/1.1" 302 -
+127.0.0.1 - - [19/Apr/2026 20:23:02] "GET /dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:23:42] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:23:43] "POST /signup HTTP/1.1" 302 -
+127.0.0.1 - - [19/Apr/2026 20:23:43] "GET /dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:24:57] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:25:15] "POST /signup HTTP/1.1" 302 -
+127.0.0.1 - - [19/Apr/2026 20:25:16] "GET /dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:25:52] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:25:52] "POST /signup HTTP/1.1" 302 -
+127.0.0.1 - - [19/Apr/2026 20:25:52] "GET /dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:26:27] "POST /api/generate HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:26:27] "POST /signup HTTP/1.1" 302 -
+127.0.0.1 - - [19/Apr/2026 20:26:27] "GET /dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [19/Apr/2026 20:27:31] "POST /api/generate HTTP/1.1" 200 -

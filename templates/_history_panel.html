@@ -1,0 +1,26 @@
+{% if history %}
+  <div class="history-toolbar">
+    <form method="post" action="{{ url_for('clear_history') }}" data-clear-history-form>
+      <button class="ghost-button small-button" type="submit">Clear history</button>
+    </form>
+  </div>
+  <div class="history-list">
+    {% for item in history %}
+      <article class="history-item">
+        <div>
+          <strong>{{ provider_labels[item['provider']] }}</strong>
+          <span>{{ item["mode"]|title }} | {{ item["use_case"]|replace('-', ' ')|title }}</span>
+        </div>
+        <p class="history-task-text">{{ item["task"] }}</p>
+        <div class="history-actions">
+          <button class="ghost-button small-button" type="button" data-copy-history-task>
+            Copy task
+          </button>
+        </div>
+        <small>{{ item["status"] }} | {{ item["created_at"] }}</small>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="muted-line">No history found.</p>
+{% endif %}

@@ -18,7 +18,11 @@ from flask import (
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from services.llm_client import AnthropicClient, GeminiClient, GroqClient, LLMClientError, OllamaClient, OpenAIClient
-from services.prompt_engine import PromptRequest, build_handoff_note, run_prompt_wizard
+from services.prompt_engine import (
+    PromptRequest,
+    build_handoff_note,
+    run_prompt_wizard,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DB_PATH = BASE_DIR / "instance" / "promptpilot.db"
@@ -131,6 +135,239 @@ def create_app(test_config=None):
             db.executescript(schema_file.read())
         db.commit()
 
+    def table_exists(table_name):
+        row = get_db().execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table_name,),
+        ).fetchone()
+        return row is not None
+
+    def table_columns(table_name):
+        if not table_exists(table_name):
+            return []
+        return [row["name"] for row in get_db().execute(f'PRAGMA table_info("{table_name}")').fetchall()]
+
+    def foreign_key_parent(table_name):
+        if not table_exists(table_name):
+            return None
+        rows = get_db().execute(f'PRAGMA foreign_key_list("{table_name}")').fetchall()
+        if not rows:
+            return None
+        return rows[0]["table"]
+
+    def repair_database_schema():
+        db = get_db()
+        expected_user_columns = [
+            "id",
+            "email",
+            "password_hash",
+            "name",
+            "occupation",
+            "location",
+            "date_of_birth",
+            "goals",
+            "created_at",
+            "updated_at",
+        ]
+        expected_generation_columns = [
+            "id",
+            "user_id",
+            "provider",
+            "mode",
+            "use_case",
+            "task",
+            "optimized_prompt",
+            "response_text",
+            "status",
+            "created_at",
+        ]
+
+        for temp_table in ("users_new", "generations_new"):
+            if table_exists(temp_table):
+                db.execute(f'DROP TABLE "{temp_table}"')
+
+        def create_users_table_sql():
+            return """
+                CREATE TABLE users_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    occupation TEXT NOT NULL,
+                    location TEXT NOT NULL,
+                    date_of_birth TEXT NOT NULL,
+                    goals TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+
+        def create_generations_table_sql():
+            return """
+                CREATE TABLE generations_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    provider TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    use_case TEXT NOT NULL,
+                    task TEXT NOT NULL,
+                    optimized_prompt TEXT NOT NULL,
+                    response_text TEXT,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """
+
+        def rebuild_users_table():
+            current_columns = table_columns("users")
+            source_table = None
+
+            if current_columns:
+                if current_columns == expected_user_columns:
+                    return
+                if {"industry", "primary_use_case", "preferred_tone"}.intersection(current_columns):
+                    source_table = "users"
+            elif table_exists("users_legacy"):
+                source_table = "users_legacy"
+
+            if source_table is None:
+                return
+
+            # Recreate the table instead of renaming the legacy one so SQLite does not rewrite
+            # foreign-key targets in sibling tables.
+            db.execute("PRAGMA foreign_keys = OFF")
+            try:
+                db.execute("BEGIN")
+                db.execute(create_users_table_sql())
+                if source_table == "users":
+                    db.execute(
+                        """
+                        INSERT INTO users_new (
+                            id,
+                            email,
+                            password_hash,
+                            name,
+                            occupation,
+                            location,
+                            date_of_birth,
+                            goals,
+                            created_at,
+                            updated_at
+                        )
+                        SELECT
+                            id,
+                            email,
+                            password_hash,
+                            name,
+                            occupation,
+                            location,
+                            date_of_birth,
+                            COALESCE(goals, ''),
+                            created_at,
+                            updated_at
+                        FROM users
+                        """
+                    )
+                    db.execute("DROP TABLE users")
+                else:
+                    db.execute(
+                        """
+                        INSERT INTO users_new (
+                            id,
+                            email,
+                            password_hash,
+                            name,
+                            occupation,
+                            location,
+                            date_of_birth,
+                            goals,
+                            created_at,
+                            updated_at
+                        )
+                        SELECT
+                            id,
+                            email,
+                            password_hash,
+                            name,
+                            occupation,
+                            location,
+                            date_of_birth,
+                            COALESCE(goals, ''),
+                            created_at,
+                            updated_at
+                        FROM users_legacy
+                        """
+                    )
+                    db.execute("DROP TABLE users_legacy")
+                db.execute("ALTER TABLE users_new RENAME TO users")
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db.execute("PRAGMA foreign_keys = ON")
+
+        def rebuild_generations_table():
+            current_columns = table_columns("generations")
+            parent_table = foreign_key_parent("generations")
+            if current_columns == expected_generation_columns and parent_table == "users":
+                return
+
+            db.execute("PRAGMA foreign_keys = OFF")
+            try:
+                db.execute("BEGIN")
+                db.execute(create_generations_table_sql())
+                if current_columns:
+                    db.execute(
+                        """
+                        INSERT INTO generations_new (
+                            id,
+                            user_id,
+                            provider,
+                            mode,
+                            use_case,
+                            task,
+                            optimized_prompt,
+                            response_text,
+                            status,
+                            created_at
+                        )
+                        SELECT
+                            id,
+                            user_id,
+                            provider,
+                            mode,
+                            use_case,
+                            task,
+                            optimized_prompt,
+                            response_text,
+                            status,
+                            created_at
+                        FROM generations
+                        """
+                    )
+                    db.execute("DROP TABLE generations")
+                db.execute("ALTER TABLE generations_new RENAME TO generations")
+                db.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_generations_user_created ON generations(user_id, created_at DESC)"
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db.execute("PRAGMA foreign_keys = ON")
+
+        def drop_unused_legacy_users_table():
+            if table_exists("users_legacy") and foreign_key_parent("generations") == "users":
+                db.execute("DROP TABLE users_legacy")
+                db.commit()
+
+        rebuild_users_table()
+        rebuild_generations_table()
+        drop_unused_legacy_users_table()
+
     def current_user():
         user_id = session.get("user_id")
         if not user_id:
@@ -166,22 +403,34 @@ def create_app(test_config=None):
         )
         db.commit()
 
-    def log_prompt_wizard(user_id, user_name, prompt_request, wizard_result, status):
+    def get_recent_history(user_id, limit=8):
+        return get_db().execute(
+            """
+            SELECT id, provider, mode, use_case, task, optimized_prompt, status, created_at
+            FROM generations
+            WHERE user_id = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (user_id, limit),
+        ).fetchall()
+
+    def log_prompt_flow(user_id, user_name, prompt_request, flow_result, status):
         log_path = Path(app.config["LOG_FILE"])
         timestamp = datetime.now().isoformat(timespec="seconds")
         entry = "\n".join(
             [
-                f"[{timestamp}] Prompt wizard run",
+                f"[{timestamp}] Prompt flow run",
                 (
                     f"user_id={user_id} user_name={user_name!r} "
                     f"provider={prompt_request.target_provider} mode={prompt_request.mode} "
                     f"use_case={prompt_request.use_case} status={status}"
                 ),
                 (
-                    f"selected_variant={wizard_result['selected_variant']} "
-                    f"selected_score={wizard_result['selected_score']}"
+                    f"selected_variant={flow_result['selected_variant']} "
+                    f"selected_score={flow_result['selected_score']}"
                 ),
-                wizard_result["trace"],
+                flow_result["trace"],
                 "",
             ]
         )
@@ -274,8 +523,6 @@ def create_app(test_config=None):
     @app.route("/signup", methods=("GET", "POST"))
     def signup():
         if request.method == "POST":
-            primary_use_case = request.form.get("primary_use_case", "").strip() or "general"
-            preferred_tone = request.form.get("preferred_tone", "").strip() or "Direct and polished"
             form = {
                 "name": request.form.get("name", "").strip(),
                 "email": request.form.get("email", "").strip().lower(),
@@ -283,9 +530,6 @@ def create_app(test_config=None):
                 "occupation": request.form.get("occupation", "").strip(),
                 "location": request.form.get("location", "").strip(),
                 "date_of_birth": request.form.get("date_of_birth", "").strip(),
-                "industry": request.form.get("industry", "").strip(),
-                "primary_use_case": primary_use_case,
-                "preferred_tone": preferred_tone,
                 "goals": request.form.get("goals", "").strip(),
             }
             required_fields = [
@@ -312,12 +556,9 @@ def create_app(test_config=None):
                         occupation,
                         location,
                         date_of_birth,
-                        industry,
-                        primary_use_case,
-                        preferred_tone,
                         goals
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         form["email"],
@@ -326,9 +567,6 @@ def create_app(test_config=None):
                         form["occupation"],
                         form["location"],
                         form["date_of_birth"],
-                        form["industry"],
-                        form["primary_use_case"],
-                        form["preferred_tone"],
                         form["goals"],
                     ),
                 )
@@ -375,17 +613,19 @@ def create_app(test_config=None):
     @app.route("/dashboard")
     @login_required
     def dashboard():
-        history = get_db().execute(
-            """
-            SELECT id, provider, mode, use_case, task, optimized_prompt, status, created_at
-            FROM generations
-            WHERE user_id = ?
-            ORDER BY created_at DESC, id DESC
-            LIMIT 8
-            """,
-            (g.user["id"],),
-        ).fetchall()
+        history = get_recent_history(g.user["id"])
         return render_template("dashboard.html", history=history)
+
+    @app.get("/api/history")
+    @login_required
+    def history_fragment():
+        history = get_recent_history(g.user["id"])
+        return jsonify(
+            {
+                "count": len(history),
+                "html": render_template("_history_panel.html", history=history),
+            }
+        )
 
     @app.post("/history/clear")
     @login_required
@@ -399,20 +639,11 @@ def create_app(test_config=None):
     @app.post("/profile")
     @login_required
     def update_profile():
-        def preserved_form_value(field_name):
-            if field_name in request.form:
-                return request.form.get(field_name, "").strip()
-            current_value = g.user[field_name]
-            return current_value.strip() if isinstance(current_value, str) else (current_value or "")
-
         form = {
             "name": request.form.get("name", "").strip(),
             "occupation": request.form.get("occupation", "").strip(),
             "location": request.form.get("location", "").strip(),
             "date_of_birth": request.form.get("date_of_birth", "").strip(),
-            "industry": preserved_form_value("industry"),
-            "primary_use_case": preserved_form_value("primary_use_case"),
-            "preferred_tone": preserved_form_value("preferred_tone"),
             "goals": request.form.get("goals", "").strip(),
         }
         db = get_db()
@@ -423,9 +654,6 @@ def create_app(test_config=None):
                 occupation = ?,
                 location = ?,
                 date_of_birth = ?,
-                industry = ?,
-                primary_use_case = ?,
-                preferred_tone = ?,
                 goals = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -435,9 +663,6 @@ def create_app(test_config=None):
                 form["occupation"],
                 form["location"],
                 form["date_of_birth"],
-                form["industry"],
-                form["primary_use_case"],
-                form["preferred_tone"],
                 form["goals"],
                 g.user["id"],
             ),
@@ -465,13 +690,18 @@ def create_app(test_config=None):
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
-        wizard_result = run_prompt_wizard(g.user, prompt_request)
-        optimized_prompt = wizard_result["final_prompt"]
+        # goal_alignment = evaluate_goal_alignment(g.user, prompt_request)
+        flow_result = run_prompt_wizard(g.user, prompt_request)
+        optimized_prompt = flow_result["final_prompt"]
         handoff_note = build_handoff_note(prompt_request.target_provider, prompt_request.mode)
         response_text = None
         status = "prompt_ready"
         selected_model = prompt_request.model or get_default_model(prompt_request.target_provider)
 
+        # if goal_alignment["has_goals"] and not goal_alignment["is_relevant"] and prompt_request.mode == "generate":
+        #     response_text = build_goal_redirect_text(goal_alignment)
+        #     handoff_note = response_text
+        #     status = "goal_redirect"
         if prompt_request.mode == "generate":
             client = get_generation_client(prompt_request.target_provider)
             try:
@@ -482,7 +712,7 @@ def create_app(test_config=None):
                 response_text = str(exc)
                 handoff_note = str(exc)
 
-        log_prompt_wizard(g.user["id"], g.user["name"], prompt_request, wizard_result, status)
+        log_prompt_flow(g.user["id"], g.user["name"], prompt_request, flow_result, status)
         save_generation(g.user["id"], prompt_request, optimized_prompt, response_text, status)
 
         return jsonify(
@@ -499,6 +729,7 @@ def create_app(test_config=None):
 
     with app.app_context():
         init_db()
+        repair_database_schema()
 
     return app
 

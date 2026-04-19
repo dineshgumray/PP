@@ -30,22 +30,19 @@ PROFILE_FIELD_LABELS = {
     "occupation": "Occupation",
     "location": "Location",
     "age": "Age",
-    "industry": "Industry",
-    "primary_use_case": "Primary use case",
-    "preferred_tone": "Preferred tone",
     "goals": "Goals",
 }
 
 PROFILE_FIELD_PRIORITY = {
-    "career": ("occupation", "industry", "location", "goals", "preferred_tone"),
-    "content": ("occupation", "industry", "goals", "preferred_tone", "location"),
-    "study": ("occupation", "goals", "preferred_tone", "age"),
-    "travel": ("location", "age", "goals", "preferred_tone"),
-    "business": ("occupation", "industry", "goals", "location", "preferred_tone"),
-    "coding": ("occupation", "industry", "goals", "preferred_tone"),
-    "research": ("occupation", "industry", "goals", "preferred_tone", "location"),
-    "personal-brand": ("occupation", "industry", "goals", "preferred_tone", "location"),
-    "general": ("occupation", "location", "goals", "preferred_tone"),
+    "career": ("occupation", "location", "goals"),
+    "content": ("occupation", "goals", "location"),
+    "study": ("occupation", "goals", "age"),
+    "travel": ("location", "age", "goals"),
+    "business": ("occupation", "goals", "location"),
+    "coding": ("occupation", "goals"),
+    "research": ("occupation", "goals", "location"),
+    "personal-brand": ("occupation", "goals", "location"),
+    "general": ("occupation", "location", "goals"),
 }
 
 HANDOFF_NOTES = {
@@ -119,17 +116,6 @@ def coerce_text(value):
     return str(value).strip()
 
 
-def lookup_value(mapping, key, default=""):
-    if mapping is None:
-        return default
-    if hasattr(mapping, "get"):
-        return mapping.get(key, default)
-    try:
-        return mapping[key]
-    except (KeyError, IndexError, TypeError):
-        return default
-
-
 def dedupe_preserve_order(items):
     seen = set()
     result = []
@@ -166,7 +152,6 @@ def human_join(items):
 
 def resolve_thinking_styles(prompt_request, user_profile):
     fallback_styles = [
-        coerce_text(lookup_value(user_profile, "preferred_tone")) or "Direct and polished",
         THINKING_STYLE_HINTS.get(prompt_request.use_case, THINKING_STYLE_HINTS["general"]),
     ]
     styles = split_thinking_styles(getattr(prompt_request, "thinking_styles", ""))
@@ -180,9 +165,6 @@ def build_profile_lines(user_profile, prompt_request, profile_density):
         "occupation": user_profile["occupation"],
         "location": user_profile["location"],
         "age": calculate_age(user_profile["date_of_birth"]),
-        "industry": user_profile["industry"] or "Not specified",
-        "primary_use_case": user_profile["primary_use_case"],
-        "preferred_tone": user_profile["preferred_tone"],
         "goals": user_profile["goals"],
     }
     prioritized_fields = list(PROFILE_FIELD_PRIORITY[prompt_request.use_case])
@@ -193,7 +175,6 @@ def build_profile_lines(user_profile, prompt_request, profile_density):
         for field in prioritized_fields
         if profile_values.get(field)
     ]
-    profile_lines.append(f"Stored profile focus: {user_profile['primary_use_case']}")
     return profile_lines
 
 
@@ -254,6 +235,7 @@ def build_output_contract(compact):
 
 def build_prompt_document(user_profile, prompt_request, thinking_styles, variant):
     profile_lines = build_profile_lines(user_profile, prompt_request, variant["profile_density"])
+    # goal_focus_lines = build_goal_focus_lines(user_profile)
     task_lines = build_task_lines(prompt_request)
     instructions = build_instruction_lines(
         prompt_request,
@@ -274,6 +256,11 @@ def build_prompt_document(user_profile, prompt_request, thinking_styles, variant
             "User profile:",
             *[f"- {line}" for line in profile_lines],
             "",
+        ]
+    )
+
+    prompt_sections.extend(
+        [
             "Task brief:",
             *[f"- {line}" for line in task_lines],
             "",
@@ -288,13 +275,32 @@ def build_prompt_document(user_profile, prompt_request, thinking_styles, variant
     return "\n".join(prompt_sections).strip()
 
 
+def build_task_input_summary(prompt_request):
+    return {
+        "task": prompt_request.task,
+        "use_case": prompt_request.use_case,
+        "target_provider": prompt_request.target_provider,
+        "mode": prompt_request.mode,
+        "audience": prompt_request.audience,
+        "desired_format": prompt_request.desired_format,
+        "output_length": prompt_request.output_length,
+        "model": prompt_request.model,
+        "thinking_styles": prompt_request.thinking_styles,
+    }
+
+
 def mutate_prompt_variants(user_profile, prompt_request):
     thinking_styles = resolve_thinking_styles(prompt_request, user_profile)
     variants = []
 
     for variant in PROMPT_WIZARD_VARIANTS:
         variant_config = dict(variant)
-        prompt = build_prompt_document(user_profile, prompt_request, thinking_styles, variant_config)
+        prompt = build_prompt_document(
+            user_profile,
+            prompt_request,
+            thinking_styles,
+            variant_config,
+        )
         variants.append(
             {
                 "variant": variant_config["name"],
@@ -305,6 +311,10 @@ def mutate_prompt_variants(user_profile, prompt_request):
         )
 
     return variants
+
+
+def initialize_prompt_variants(user_profile, prompt_request):
+    return mutate_prompt_variants(user_profile, prompt_request)
 
 
 def score_prompt_variant(candidate, prompt_request):
@@ -396,6 +406,10 @@ def score_prompt_variants(candidates, prompt_request):
     return sorted(scored_candidates, key=lambda item: item["score"], reverse=True)
 
 
+def task_aware_scoring(candidates, prompt_request):
+    return score_prompt_variants(candidates, prompt_request)
+
+
 def critique_prompt(scored_candidates, prompt_request):
     best = scored_candidates[0]
     runner_up = scored_candidates[1] if len(scored_candidates) > 1 else None
@@ -441,6 +455,10 @@ def critique_prompt(scored_candidates, prompt_request):
     }
 
 
+def critique_and_evaluation(scored_candidates, prompt_request):
+    return critique_prompt(scored_candidates, prompt_request)
+
+
 def synthesize_prompt(best_candidate, critique, user_profile, prompt_request):
     refined_config = dict(best_candidate["candidate"]["config"])
     needs_stronger_gap_rule = any("critical detail" in item.lower() for item in critique["weaknesses"])
@@ -477,31 +495,74 @@ def synthesize_prompt(best_candidate, critique, user_profile, prompt_request):
     return refined_candidate
 
 
+def prompt_refinement(best_candidate, critique, user_profile, prompt_request):
+    return synthesize_prompt(
+        best_candidate,
+        critique,
+        user_profile,
+        prompt_request,
+    )
+
+
 def format_scoreboard(scored_candidates):
     return ", ".join(f"{item['candidate']['variant']}={item['score']}" for item in scored_candidates)
 
 
-def format_trace(result):
-    strengths = "; ".join(result["critique"]["strengths"]) if result["critique"]["strengths"] else "none"
-    weaknesses = "; ".join(result["critique"]["weaknesses"]) if result["critique"]["weaknesses"] else "none"
+def format_prompt_flow_trace(result):
+    task_input = result["task_input"]
+    initialization = result["prompt_initialization"]
+    critique = result["critique_and_evaluation"]
+    scoring = result["task_aware_scoring"]
+    refinement = result["prompt_refinement"]
+    strengths = "; ".join(critique["strengths"]) if critique["strengths"] else "none"
+    weaknesses = "; ".join(critique["weaknesses"]) if critique["weaknesses"] else "none"
     return "\n".join(
         [
-            "Prompt wizard",
-            f"- Mutate: generated {len(result['candidates'])} prompt variants from the task and thinking styles.",
-            f"- Scoring: {format_scoreboard(result['scored_candidates'])}. Selected {result['selected_variant']} at {result['selected_score']}.",
-            f"- Critique strengths: {strengths}.",
-            f"- Critique gaps: {weaknesses}.",
-            f"- Synthesize: {result['selection_note']} It was rescored at {result['refined_score']}.",
+            "Prompt flow",
+            (
+                "- Task Input: "
+                f"task={task_input['task']!r} use_case={task_input['use_case']} "
+                f"provider={task_input['target_provider']} mode={task_input['mode']} "
+                f"audience={task_input['audience']!r} format={task_input['desired_format']!r} "
+                f"length={task_input['output_length']!r}."
+            ),
+            (
+                "- Prompt Initialization: "
+                f"generated {initialization['variant_count']} candidate drafts "
+                f"({', '.join(initialization['variant_names'])})."
+            ),
+            f"- Critique & Evaluation: strengths={strengths}; gaps={weaknesses}.",
+            (
+                "- Task-Aware Scoring: "
+                f"{format_scoreboard(result['scored_candidates'])}. "
+                f"Best draft {scoring['best_variant']} scored {scoring['best_score']}."
+            ),
+            (
+                "- Prompt Refinement: "
+                f"{refinement['selection_note']} Refined variant {refinement['refined_variant']} "
+                f"scored {refinement['refined_score']}."
+            ),
+            f"- Optimized Prompt: selected {result['selected_variant']} at {result['selected_score']}.",
         ]
     ).strip()
 
 
-def run_prompt_wizard(user_profile, prompt_request):
-    candidates = mutate_prompt_variants(user_profile, prompt_request)
-    scored_candidates = score_prompt_variants(candidates, prompt_request)
+def format_trace(result):
+    return format_prompt_flow_trace(result)
+
+
+def run_prompt_flow(user_profile, prompt_request):
+    task_input = build_task_input_summary(prompt_request)
+    candidates = initialize_prompt_variants(user_profile, prompt_request)
+    scored_candidates = task_aware_scoring(candidates, prompt_request)
     best_candidate = scored_candidates[0]
-    critique = critique_prompt(scored_candidates, prompt_request)
-    refined_candidate = synthesize_prompt(best_candidate, critique, user_profile, prompt_request)
+    critique = critique_and_evaluation(scored_candidates, prompt_request)
+    refined_candidate = prompt_refinement(
+        best_candidate,
+        critique,
+        user_profile,
+        prompt_request,
+    )
     refined_scored_candidate = score_prompt_variant(refined_candidate, prompt_request)
 
     if refined_scored_candidate["score"] >= best_candidate["score"]:
@@ -512,6 +573,28 @@ def run_prompt_wizard(user_profile, prompt_request):
         selection_note = "The original best draft remained stronger, so it was retained."
 
     result = {
+        "task_input": task_input,
+        "prompt_initialization": {
+            "variant_count": len(candidates),
+            "variant_names": [item["variant"] for item in candidates],
+            "thinking_styles": candidates[0]["thinking_styles"] if candidates else [],
+        },
+        "critique_and_evaluation": {
+            "strengths": critique["strengths"],
+            "weaknesses": critique["weaknesses"],
+            "best_variant": best_candidate["candidate"]["variant"],
+            "best_score": best_candidate["score"],
+        },
+        "task_aware_scoring": {
+            "scoreboard": format_scoreboard(scored_candidates),
+            "best_variant": best_candidate["candidate"]["variant"],
+            "best_score": best_candidate["score"],
+        },
+        "prompt_refinement": {
+            "refined_variant": refined_scored_candidate["candidate"]["variant"],
+            "refined_score": refined_scored_candidate["score"],
+            "selection_note": selection_note,
+        },
         "final_prompt": selected["candidate"]["prompt"],
         "selected_variant": selected["candidate"]["variant"],
         "selected_score": selected["score"],
@@ -531,8 +614,12 @@ def run_prompt_wizard(user_profile, prompt_request):
         "scored_candidates": scored_candidates,
         "critique": critique,
     }
-    result["trace"] = format_trace(result)
+    result["trace"] = format_prompt_flow_trace(result)
     return result
+
+
+def run_prompt_wizard(user_profile, prompt_request):
+    return run_prompt_flow(user_profile, prompt_request)
 
 
 @dataclass

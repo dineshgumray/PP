@@ -71,30 +71,36 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  document.querySelectorAll("[data-copy-history-task]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const historyItem = button.closest(".history-item");
-      const taskText = historyItem?.querySelector(".history-task-text")?.textContent?.trim();
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-copy-history-task]");
+    if (!button) {
+      return;
+    }
 
-      if (!taskText) {
-        return;
-      }
+    const historyItem = button.closest(".history-item");
+    const taskText = historyItem?.querySelector(".history-task-text")?.textContent?.trim();
 
-      try {
-        await copyText(taskText);
-        setStatus("History task copied", "success");
-      } catch (error) {
-        setStatus("Copy failed", "error");
-      }
-    });
+    if (!taskText) {
+      return;
+    }
+
+    try {
+      await copyText(taskText);
+      setStatus("History task copied", "success");
+    } catch (error) {
+      setStatus("Copy failed", "error");
+    }
   });
 
-  document.querySelectorAll("[data-clear-history-form]").forEach((form) => {
-    form.addEventListener("submit", (event) => {
-      if (!window.confirm("Clear all saved history entries?")) {
-        event.preventDefault();
-      }
-    });
+  document.addEventListener("submit", (event) => {
+    const form = event.target.closest("[data-clear-history-form]");
+    if (!form) {
+      return;
+    }
+
+    if (!window.confirm("Clear all saved history entries?")) {
+      event.preventDefault();
+    }
   });
 
   document.querySelectorAll("[data-delete-profile-button]").forEach((button) => {
@@ -118,6 +124,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const modelInput = document.getElementById("model-input");
   const promptOutput = document.getElementById("prompt-output");
   const responseOutput = document.getElementById("response-output");
+  const historyCount = document.getElementById("history-count");
+  const historyPanel = document.getElementById("history-panel");
   const outputCard = document.querySelector(".output-card");
   const generateOnlyBlocks = document.querySelectorAll("[data-generate-only]");
   const submitButton = document.getElementById("generate-button");
@@ -193,6 +201,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  async function refreshHistorySection() {
+    if (!historyCount || !historyPanel) {
+      return;
+    }
+
+    const response = await fetch("/api/history", {
+      headers: {
+        "X-Requested-With": "fetch",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to refresh history.");
+    }
+
+    const data = await response.json();
+    historyCount.textContent = `${data.count ?? 0} items`;
+    historyPanel.innerHTML = data.html || '<p class="muted-line">No history found.</p>';
+  }
+
   providerSelect.addEventListener("change", refreshModeState);
   modeSelect.addEventListener("change", refreshModeState);
   refreshModeState();
@@ -222,12 +250,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (data.status === "generated") {
         setStatus("Generated", "success");
+      } else if (data.status === "goal_redirect") {
+        setStatus("Goal redirect", "warning");
       } else if (data.status === "provider_error") {
         setStatus("Provider error", "error");
       } else if (data.status === "handoff_required" || data.status === "prompt_ready") {
         setStatus("Prompt ready", "warning");
       } else {
         setStatus("Needs attention", "error");
+      }
+
+      try {
+        await refreshHistorySection();
+      } catch (refreshError) {
+        console.warn(refreshError);
       }
     } catch (error) {
       responseOutput.textContent = error.message;

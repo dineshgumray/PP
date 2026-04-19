@@ -40,10 +40,26 @@
               <span>Location</span>
               <input type="text" name="location" value="{{ g.user['location'] }}" required>
             </label>
-            <label>
-              <span>Date of birth</span>
-              <input type="date" name="date_of_birth" value="{{ g.user['date_of_birth'] }}" required>
-            </label>
+            <input
+              id="dob-toggle"
+              class="privacy-toggle-input"
+              type="checkbox"
+              aria-controls="dob-field"
+              aria-label="Toggle date of birth visibility"
+            >
+            <div class="full-width privacy-field">
+              <div class="privacy-field-header">
+                <span>Date of birth</span>
+                <label class="toggle-switch" for="dob-toggle">
+                  <span class="toggle-switch__rail" aria-hidden="true">
+                    <span class="toggle-switch__knob"></span>
+                  </span>
+                </label>
+              </div>
+              <div id="dob-field" class="privacy-field-body">
+                <input type="date" name="date_of_birth" value="{{ g.user['date_of_birth'] }}" required>
+              </div>
+            </div>
             <label class="full-width">
               <span>Goals (optional)</span>
               <textarea name="goals" rows="4">{{ g.user['goals'] }}</textarea>
@@ -70,7 +86,7 @@
             <h2>History</h2>
           </div>
           <div class="section-toggle-meta">
-            <span class="history-count">{{ history|length }} items</span>
+            <span id="history-count" class="history-count">{{ history|length }} items</span>
             <button
               class="toggle-pill"
               type="button"
@@ -86,32 +102,7 @@
           </div>
         </div>
         <div id="history-panel" class="collapsible-body is-hidden" data-section-body>
-          {% if history %}
-            <div class="history-toolbar">
-              <form method="post" action="{{ url_for('clear_history') }}" data-clear-history-form>
-                <button class="ghost-button small-button" type="submit">Clear history</button>
-              </form>
-            </div>
-            <div class="history-list">
-              {% for item in history %}
-                <article class="history-item">
-                  <div>
-                    <strong>{{ provider_labels[item['provider']] }}</strong>
-                    <span>{{ item["mode"]|title }} | {{ item["use_case"]|replace('-', ' ')|title }}</span>
-                  </div>
-                  <p class="history-task-text">{{ item["task"] }}</p>
-                  <div class="history-actions">
-                    <button class="ghost-button small-button" type="button" data-copy-history-task>
-                      Copy task
-                    </button>
-                  </div>
-                  <small>{{ item["status"] }} | {{ item["created_at"] }}</small>
-                </article>
-              {% endfor %}
-            </div>
-          {% else %}
-            <p class="muted-line">No history found.</p>
-          {% endif %}
+          {% include "_history_panel.html" %}
         </div>
       </div>
     </aside>

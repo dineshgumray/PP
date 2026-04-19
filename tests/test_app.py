@@ -41,7 +41,7 @@ class PromptPilotAppTests(unittest.TestCase):
                 "occupation": "Product Manager",
                 "location": "Bengaluru, India",
                 "date_of_birth": "1996-08-11",
-                "goals": "Move into global product leadership roles.",
+                "goals": "Prepare product management interview plans, networking emails, market updates, business updates, and concise policy memos.",
             },
             follow_redirects=True,
         )
@@ -61,6 +61,17 @@ class PromptPilotAppTests(unittest.TestCase):
         self.assertNotIn(b"Login to PromptPilot", response.data)
         self.assertNotIn(b"Return to your workspace", response.data)
 
+    def test_landing_page_uses_neutral_copy(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Stop repeating your background every time you ask for help.", response.data)
+        self.assertIn(b"hand that prompt off for generation or return the final answer in the app.", response.data)
+        self.assertIn(b"Use the optimized prompt anywhere, or generate the final answer in the app.", response.data)
+        self.assertNotIn(b"LLM", response.data)
+        self.assertNotIn(b"locally", response.data)
+        self.assertNotIn(b"Groq", response.data)
+        self.assertNotIn(b"Ollama", response.data)
+
     def test_signup_redirects_to_dashboard(self):
         response = self.signup()
         self.assertEqual(response.status_code, 200)
@@ -73,6 +84,14 @@ class PromptPilotAppTests(unittest.TestCase):
         self.assertIn(b"Delete profile", response.data)
         self.assertIn(b"brand/logo.png", response.data)
         self.assertIn(b"Goals (optional)", response.data)
+        self.assertIn(b'id="dob-toggle"', response.data)
+        self.assertIn(b'type="checkbox"', response.data)
+        self.assertIn(b'aria-label="Toggle date of birth visibility"', response.data)
+        self.assertNotIn(b"Show date of birth", response.data)
+        self.assertNotIn(b"Hide date of birth", response.data)
+        self.assertIn(b'id="dob-field"', response.data)
+        self.assertNotIn(b"data-dob-toggle", response.data)
+        self.assertNotIn(b"data-dob-field", response.data)
         self.assertIn(b'id="provider-field">', response.data)
         self.assertIn(b"generate-only is-hidden", response.data)
         self.assertIn(b"prompt-mode", response.data)
@@ -115,7 +134,7 @@ class PromptPilotAppTests(unittest.TestCase):
 
         self.assertEqual(user["goals"], "")
 
-    def test_signup_defaults_hidden_metadata(self):
+    def test_signup_uses_remaining_profile_columns(self):
         response = self.client.post(
             "/signup",
             data={
@@ -134,16 +153,165 @@ class PromptPilotAppTests(unittest.TestCase):
         conn = sqlite3.connect(self.db_path)
         try:
             conn.row_factory = sqlite3.Row
+            columns = [row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
+            self.assertNotIn("industry", columns)
+            self.assertNotIn("primary_use_case", columns)
+            self.assertNotIn("preferred_tone", columns)
             user = conn.execute(
-                "SELECT industry, primary_use_case, preferred_tone FROM users WHERE email = ?",
+                "SELECT name, occupation, location, date_of_birth, goals FROM users WHERE email = ?",
                 ("aarav.defaults@example.com",),
             ).fetchone()
         finally:
             conn.close()
 
-        self.assertEqual(user["industry"], "")
-        self.assertEqual(user["primary_use_case"], "general")
-        self.assertEqual(user["preferred_tone"], "Direct and polished")
+        self.assertEqual(user["name"], "Aarav Sharma")
+        self.assertEqual(user["occupation"], "Product Manager")
+        self.assertEqual(user["location"], "Bengaluru, India")
+        self.assertEqual(user["date_of_birth"], "1996-08-11")
+        self.assertEqual(user["goals"], "")
+
+    def test_legacy_users_table_is_migrated(self):
+        legacy_db_fd, legacy_db_path = tempfile.mkstemp()
+        legacy_log_fd, legacy_log_path = tempfile.mkstemp()
+        os.close(legacy_db_fd)
+        os.close(legacy_log_fd)
+
+        try:
+            conn = sqlite3.connect(legacy_db_path)
+            try:
+                conn.executescript(
+                    """
+                    PRAGMA foreign_keys = OFF;
+                    CREATE TABLE users (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        email TEXT NOT NULL UNIQUE,
+                        password_hash TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        occupation TEXT NOT NULL,
+                        location TEXT NOT NULL,
+                        date_of_birth TEXT NOT NULL,
+                        industry TEXT,
+                        primary_use_case TEXT NOT NULL,
+                        preferred_tone TEXT NOT NULL,
+                        goals TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE TABLE generations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        provider TEXT NOT NULL,
+                        mode TEXT NOT NULL,
+                        use_case TEXT NOT NULL,
+                        task TEXT NOT NULL,
+                        optimized_prompt TEXT NOT NULL,
+                        response_text TEXT,
+                        status TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users_legacy(id) ON DELETE CASCADE
+                    );
+                    INSERT INTO users (
+                        email,
+                        password_hash,
+                        name,
+                        occupation,
+                        location,
+                        date_of_birth,
+                        industry,
+                        primary_use_case,
+                        preferred_tone,
+                        goals
+                    )
+                    VALUES (
+                        'legacy@example.com',
+                        'hash',
+                        'Legacy User',
+                        'Builder',
+                        'Delhi, India',
+                        '1990-01-01',
+                        'SaaS',
+                        'career',
+                        'Direct and polished',
+                        'Build stuff'
+                    );
+                    INSERT INTO generations (
+                        user_id,
+                        provider,
+                        mode,
+                        use_case,
+                        task,
+                        optimized_prompt,
+                        response_text,
+                        status
+                    )
+                    VALUES (
+                        1,
+                        'groq',
+                        'prompt',
+                        'career',
+                        'Legacy task',
+                        'Legacy prompt',
+                        NULL,
+                        'prompt_ready'
+                    );
+                    """
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            app = create_app(
+                {
+                    "TESTING": True,
+                    "SECRET_KEY": "test-secret",
+                    "DATABASE": legacy_db_path,
+                    "LOG_FILE": legacy_log_path,
+                }
+            )
+
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["user_id"] = 1
+
+            response = client.post(
+                "/api/generate",
+                json={
+                    "task": "Write a product update.",
+                    "use_case": "business",
+                    "target_provider": "chatgpt",
+                    "mode": "prompt",
+                    "audience": "Leadership team",
+                },
+            )
+
+            self.assertEqual(response.status_code, 200)
+
+            conn = sqlite3.connect(legacy_db_path)
+            try:
+                conn.row_factory = sqlite3.Row
+                columns = [row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
+                self.assertNotIn("industry", columns)
+                self.assertNotIn("primary_use_case", columns)
+                self.assertNotIn("preferred_tone", columns)
+                fk_parent = conn.execute("PRAGMA foreign_key_list(generations)").fetchone()["table"]
+                self.assertEqual(fk_parent, "users")
+                user = conn.execute(
+                    "SELECT name, occupation, location, date_of_birth, goals FROM users WHERE email = ?",
+                    ("legacy@example.com",),
+                ).fetchone()
+                generation_count = conn.execute("SELECT COUNT(*) FROM generations").fetchone()[0]
+            finally:
+                conn.close()
+
+            self.assertEqual(user["name"], "Legacy User")
+            self.assertEqual(user["occupation"], "Builder")
+            self.assertEqual(user["location"], "Delhi, India")
+            self.assertEqual(user["date_of_birth"], "1990-01-01")
+            self.assertEqual(user["goals"], "Build stuff")
+            self.assertEqual(generation_count, 2)
+        finally:
+            os.unlink(legacy_db_path)
+            os.unlink(legacy_log_path)
 
     def test_generate_prompt_returns_json(self):
         self.signup()
@@ -162,16 +330,91 @@ class PromptPilotAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["status"], "prompt_ready")
+        self.assertIn("Goal focus:", payload["optimized_prompt"])
         self.assertIn("Create a 5-point interview prep plan", payload["optimized_prompt"])
         self.assertNotIn("wizard_trace", payload)
         self.assertNotIn("wizard_selected_variant", payload)
         self.assertNotIn("wizard_selected_score", payload)
         log_text = self.read_log()
-        self.assertIn("Prompt wizard run", log_text)
-        self.assertIn("Mutate:", log_text)
-        self.assertIn("Scoring:", log_text)
-        self.assertIn("Critique", log_text)
-        self.assertIn("Synthesize:", log_text)
+        self.assertIn("Prompt flow run", log_text)
+        self.assertIn("Task Input:", log_text)
+        self.assertIn("Prompt Initialization:", log_text)
+        self.assertIn("Critique & Evaluation:", log_text)
+        self.assertIn("Task-Aware Scoring:", log_text)
+        self.assertIn("Prompt Refinement:", log_text)
+        self.assertIn("Optimized Prompt:", log_text)
+
+    @patch("services.llm_client.OpenAIClient.generate", return_value="This should not be used.")
+    def test_generate_redirects_tasks_outside_goals(self, mock_generate):
+        self.signup()
+        self.client.post(
+            "/profile",
+            data={
+                "name": "Aarav Sharma",
+                "occupation": "Product Manager",
+                "location": "Bengaluru, India",
+                "date_of_birth": "1996-08-11",
+                "goals": "Give details of zodiac sign.",
+            },
+            follow_redirects=True,
+        )
+
+        response = self.client.post(
+            "/api/generate",
+            json={
+                "task": "Need details on chair.",
+                "use_case": "general",
+                "target_provider": "chatgpt",
+                "mode": "generate",
+                "audience": "General audience",
+            },
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["status"], "goal_redirect")
+        self.assertIn("Goal focus:", payload["optimized_prompt"])
+        self.assertIn("Give details of zodiac sign.", payload["optimized_prompt"])
+        self.assertIn("Need details on chair.", payload["optimized_prompt"])
+        self.assertIn("What I can do is help with your goal: Give details of zodiac sign.", payload["response_text"])
+        self.assertIn("Briefly, this goal is about zodiac signs", payload["response_text"])
+        self.assertIn("Need details on chair.", payload["response_text"])
+        self.assertEqual(payload["response_text"], payload["handoff_note"])
+        mock_generate.assert_not_called()
+
+    @patch("services.llm_client.OpenAIClient.generate", return_value="Cancer is a water sign.")
+    def test_generate_accepts_zodiac_sign_tasks_when_goal_mentions_zodiac(self, mock_generate):
+        self.signup()
+        self.client.post(
+            "/profile",
+            data={
+                "name": "Aarav Sharma",
+                "occupation": "Product Manager",
+                "location": "Bengaluru, India",
+                "date_of_birth": "1996-08-11",
+                "goals": "Give details on zodiac sign only.",
+            },
+            follow_redirects=True,
+        )
+        self.app.config["OPENAI_API_KEY"] = "test-openai-key"
+
+        response = self.client.post(
+            "/api/generate",
+            json={
+                "task": "cancer",
+                "use_case": "general",
+                "target_provider": "chatgpt",
+                "mode": "generate",
+                "audience": "General audience",
+            },
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["status"], "generated")
+        self.assertEqual(payload["response_text"], "Cancer is a water sign.")
+        self.assertIn("Generate mode can call OpenAI directly when OPENAI_API_KEY is configured.", payload["handoff_note"])
+        mock_generate.assert_called_once()
 
     def test_clear_history_empties_saved_generations(self):
         self.signup()
@@ -194,23 +437,37 @@ class PromptPilotAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"No history found.", response.data)
 
-    def test_update_profile_preserves_hidden_fields(self):
+    def test_history_fragment_refreshes_after_generate(self):
         self.signup()
 
-        conn = sqlite3.connect(self.db_path)
-        try:
-            conn.execute(
-                """
-                UPDATE users
-                SET industry = ?, primary_use_case = ?, preferred_tone = ?
-                WHERE email = ?
-                """,
-                ("SaaS", "career", "Direct and polished", "aarav@example.com"),
-            )
-            conn.commit()
-        finally:
-            conn.close()
+        before = self.client.get("/api/history")
+        self.assertEqual(before.status_code, 200)
+        before_payload = before.get_json()
+        self.assertEqual(before_payload["count"], 0)
+        self.assertIn("No history found.", before_payload["html"])
 
+        self.client.post(
+            "/api/generate",
+            json={
+                "task": "Write a concise follow-up email.",
+                "use_case": "career",
+                "target_provider": "chatgpt",
+                "mode": "prompt",
+                "audience": "Recruiter",
+            },
+        )
+
+        after = self.client.get("/api/history")
+        self.assertEqual(after.status_code, 200)
+        after_payload = after.get_json()
+        self.assertEqual(after_payload["count"], 1)
+        self.assertIn("Write a concise follow-up email.", after_payload["html"])
+        self.assertIn("Prompt | Career", after_payload["html"])
+        self.assertIn("Copy task", after_payload["html"])
+        self.assertIn("Clear history", after_payload["html"])
+
+    def test_update_profile_updates_visible_fields(self):
+        self.signup()
         response = self.client.post(
             "/profile",
             data={
@@ -229,15 +486,17 @@ class PromptPilotAppTests(unittest.TestCase):
         try:
             conn.row_factory = sqlite3.Row
             user = conn.execute(
-                "SELECT industry, primary_use_case, preferred_tone FROM users WHERE email = ?",
+                "SELECT name, occupation, location, date_of_birth, goals FROM users WHERE email = ?",
                 ("aarav@example.com",),
             ).fetchone()
         finally:
             conn.close()
 
-        self.assertEqual(user["industry"], "SaaS")
-        self.assertEqual(user["primary_use_case"], "career")
-        self.assertEqual(user["preferred_tone"], "Direct and polished")
+        self.assertEqual(user["name"], "Aarav Sharma")
+        self.assertEqual(user["occupation"], "Senior Product Manager")
+        self.assertEqual(user["location"], "Berlin, Germany")
+        self.assertEqual(user["date_of_birth"], "1996-08-11")
+        self.assertEqual(user["goals"], "Move into global product leadership roles.")
 
     def test_delete_profile_removes_user_and_history(self):
         self.signup()

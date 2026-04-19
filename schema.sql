@@ -6,9 +6,6 @@ CREATE TABLE IF NOT EXISTS users (
     occupation TEXT NOT NULL,
     location TEXT NOT NULL,
     date_of_birth TEXT NOT NULL,
-    industry TEXT,
-    primary_use_case TEXT NOT NULL,
-    preferred_tone TEXT NOT NULL,
     goals TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
